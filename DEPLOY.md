@@ -99,7 +99,7 @@ Libera tráfego externo na porta `8080`, necessária para acessar a aplicação 
 ## 4) Criar Regra de Firewall para liberar a porta 80
 
 ```bash
-az network nsg rule create  --resource-group rg-vm-challenge --nsg-name vm-challengeNSG--name port_80 --protocol tcp  --priority 1020  --destination-port-range 80
+az network nsg rule create  --resource-group rg-vm-challenge --nsg-name vm-challengeNSG --name port_80 --protocol tcp  --priority 1020  --destination-port-range 80
 ```
 
 Libera tráfego externo na porta `80`, permitindo acesso padrão HTTP.
