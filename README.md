@@ -13,144 +13,176 @@ Projeto desenvolvido no contexto do **Challenge 2025 - 1º Semestre**, promovido
 
 ---
 
-## ✅ Passo a Passo: Publicação da Imagem no Docker Hub
+# 🚀 Passo a Passo: Deploy da Aplicação MotoTrack (Java + Docker) no Azure App Service
 
-### 1) Faça login no Docker Hub
+Este guia descreve como publicar a aplicação **MotoTrack** (Java 21, Spring Boot, Docker) no **Azure App Service**, com **Azure SQL Database** como banco de dados.  
+Todos os comandos estão prontos para serem executados via **Azure CLI** (no PowerShell ou no Bash).
 
+---
+
+## 📦 1) Build e Push da Imagem no Docker Hub
+
+### a) Build da imagem local
+```bash
+docker build -t rafael051/mototrack-1.0:latest .
+```
+
+### b) Login no Docker Hub
 ```bash
 docker login
 ```
 
 Informe:
-
-- Username: rafael051
-- Password: sua senha ou token de acesso.
+- **Username:** rafael051
+- **Password:** sua senha ou token de acesso
 
 Se aparecer:
-
 ```bash
 Login Succeeded
 ```
 
-### 2) Faça o push da imagem para o Docker Hub
-
+### c) Push da imagem para o Docker Hub
 ```bash
-docker push rafael051/mototrack-1.0
+docker push rafael051/mototrack-1.0:latest
 ```
 
-O Docker enviará todas as camadas da imagem para o seu repositório.
+Confirme em: [https://hub.docker.com/repositories](https://hub.docker.com/repositories)
+
+---
+
+## 🔑 2) Login no Azure
+
+```bash
+az login
+```
+
+Autentique-se no navegador.  
+Opcional: selecione a subscription correta:
+
+```bash
+az account set --subscription "<ID_DA_SUBSCRIPTION>"
+```
+
+---
+
+## 🖥️ 3) Criar Resource Group
+
+```bash
+az group create -l eastus -n rg-mototrack-appsvc
+```
+
+Cria um grupo de recursos na região **eastus**.
+
+---
+
+## 🖥️ 4) Criar App Service Plan (Linux)
+
+```bash
+az appservice plan create   --name plan-mototrack-p1v3   --resource-group rg-mototrack-appsvc   --location eastus   --is-linux   --sku P1v3
+```
+
+Cria um **App Service Plan Linux** no SKU **P1v3** (Premium v3).
+
+---
+
+## 🖥️ 5) Criar Web App (Docker)
+
+```bash
+az webapp create   --name app-mototrack-rm557837   --resource-group rg-mototrack-appsvc   --plan plan-mototrack-p1v3   --deployment-container-image-name rafael051/mototrack-1.0:latest
+```
+
+---
+
+## ⚙️ 6) Configurar Variáveis Básicas
+
+```bash
+az webapp config appsettings set   --name app-mototrack-rm557837   --resource-group rg-mototrack-appsvc   --settings WEBSITES_PORT=80 SERVER_PORT=80 SPRING_PROFILES_ACTIVE=prod
+```
+
+---
+
+## 🗄️ 7) Criar Azure SQL Server (em outra região)
+
+A região **eastus** não aceita novos SQL Servers.  
+Use **eastus2** ou **brazilsouth**:
+
+```bash
+az sql server create   --name sql-mototrack-rm557837   --resource-group rg-mototrack-appsvc   --location eastus2   --admin-user sqladmin   --admin-password TroqueEstaSenha!2025
+```
+
+---
+
+## 🔓 8) Liberar Firewall do SQL
+
+```bash
+az sql server firewall-rule create   --resource-group rg-mototrack-appsvc   --server sql-mototrack-rm557837   --name AllowAzureServices   --start-ip-address 0.0.0.0   --end-ip-address 0.0.0.0
+```
+
+---
+
+## 🗄️ 9) Criar Database
+
+```bash
+az sql db create   --resource-group rg-mototrack-appsvc   --server sql-mototrack-rm557837   --name db_mototrack   --service-objective S0
+```
+
+---
+
+## ⚙️ 10) Configurar Variáveis do Spring Datasource
+
+```bash
+az webapp config appsettings set   --name app-mototrack-rm557837   --resource-group rg-mototrack-appsvc   --settings     SPRING_DATASOURCE_URL="jdbc:sqlserver://sql-mototrack-rm557837.database.windows.net:1433;database=db_mototrack;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"     SPRING_DATASOURCE_USERNAME=sqladmin     SPRING_DATASOURCE_PASSWORD=TroqueEstaSenha!2025     SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.microsoft.sqlserver.jdbc.SQLServerDriver
+```
+
+---
+
+## 🔄 11) Reiniciar App Service
+
+```bash
+az webapp restart --name app-mototrack-rm557837 --resource-group rg-mototrack-appsvc
+```
+
+---
+
+## 🔎 12) Obter a URL da Aplicação
+
+```bash
+az webapp show -g rg-mototrack-appsvc -n app-mototrack-rm557837 --query defaultHostName -o tsv
+```
 
 Exemplo de saída:
 
-```bash
-The push refers to repository [docker.io/rafael051/mototrack-1.0]
-8fc2ab47dc9b: Pushed
-...
-latest: digest: sha256:...
+```
+app-mototrack-rm557837.azurewebsites.net
 ```
 
-### 3) Confirme no Docker Hub
+Acesse em:
 
-Acesse:
-
-https://hub.docker.com/repositories
-
-Repositório: `rafael051/mototrack-java21`
-
-Sua imagem deve aparecer com a tag: `latest`
-
-### 4) Como outras pessoas podem usar sua imagem
-
-Para baixar e rodar sua imagem:
-
-```bash
-docker pull rafael051/mototrack-java21
-docker run -d -p 8080:80 --name mototrack rafael051/mototrack-1.0
+```
+https://app-mototrack-rm557837.azurewebsites.net
 ```
 
 ---
 
-## ✅ Passo a Passo: Criação e Configuração da VM com Docker no Azure
-
-### 1) Criar o Resource Group
+## 🧹 13) Remover todos os recursos (opcional)
 
 ```bash
-az group create -l eastus -n rg-vm-challenge
+az group delete --name rg-mototrack-appsvc --yes --no-wait
 ```
 
-### 2) Criar a Máquina Virtual
-
-```bash
-az vm create --resource-group rg-vm-challenge --name vm-challenge --image Canonical:ubuntu-24_04-lts:minimal:24.04.202505020 --size Standard_B2s --admin-username admin_fiap --admin-password admin_fiap@123
-```
-
-### 3) Criar regra de firewall para liberar a porta 8080
-
-```bash
-az network nsg rule create --resource-group rg-vm-challenge --nsg-name vm-challengeNSG --name port_8080 --protocol tcp --priority 1010 --destination-port-range 8080
-```
-
-### 4) Criar regra de firewall para liberar a porta 80
-
-```bash
-az network nsg rule create  --resource-group rg-vm-challenge --nsg-name vm-challengeNSG--name port_80 --protocol tcp  --priority 1020  --destination-port-range 80
-```
-
-### 5) Conectar via SSH e Instalar o Docker
-
-#### a) Obter o IP público da VM
-
-```bash
-az vm show -d -g rg-vm-challenge -n vm-challenge --query publicIps -o tsv
-```
-
-Copie o IP retornado.
-
-#### b) Conectar via SSH
-
-```bash
-ssh admin_fiap@<IP_DA_VM>
-```
-
-Substitua `<IP_DA_VM>` pelo IP copiado.
-
-#### c) Instalar o Docker
-
-```bash
-sudo apt update && sudo apt install -y docker.io
-```
-
-#### d) Permitir usar Docker sem sudo
-
-```bash
-sudo usermod -aG docker $USER && newgrp docker
-```
-
-### 6) Rodar o Container em Background
-
-```bash
-docker run -d -p 8080:80 rafael051/mototrack-1.0
-```
-
-### 7) (Opcional) Remover o Resource Group
-
-```bash
-az group delete --name rg-vm-challenge --yes --no-wait
-```
+Remove o grupo de recursos e todos os recursos associados.
 
 ---
 
-✅ Pronto! Sua aplicação MotoTrack está publicada, disponível no Azure e acessível via o IP público da VM:
-
-```
-http://<IP_DA_VM>:8080/swagger-ui.html
-```
+✅ **Pronto!** Sua aplicação está publicada no **Azure App Service** e integrada ao **Azure SQL Database**.
 
 ---
 
 ## 🚀 Tecnologias Utilizadas
 
 - Java 21
-- Spring Boot 3.4.5
+- Spring Boot 3.1.5
 - Docker
 - Azure CLI
+- Azure App Service (Linux, Docker)
+- Azure SQL Database
